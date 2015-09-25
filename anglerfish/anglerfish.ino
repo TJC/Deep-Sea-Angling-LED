@@ -22,8 +22,7 @@
 #define NUM_STRIPS 8
 CRGB leds[NUM_STRIPS * NUM_LEDS_PER_STRIP];
 
-#define LEDCOUNT NUM_STRIPS * NUM_LEDS_PER_STRIP
-// CRGB leds[LEDCOUNT+1];
+#define LEDCOUNT 1200
 
 ///////////// Test sequence ////////////
 void boot_up() {
@@ -141,6 +140,83 @@ void twinkle(unsigned long duration) {
 
 }
 
+/////////// Fire effect /////////////
+// Could also be bubble effect with different pallette
+// taken from FastLED example and modified
+// ideally should only apply to vertical strips, and should be applied
+// separately to each one
+
+// COOLING: How much does the air cool as it rises?
+// Less cooling = taller flames.  More cooling = shorter flames.
+// Default 50, suggested range 20-100 
+#define COOLING  45
+
+// SPARKING: What chance (out of 255) is there that a new spark will be lit?
+// Higher chance = more roaring fire.  Lower chance = more flickery fire.
+// Default 120, suggested range 50-200.
+#define SPARKING 100
+
+#define FIRE_NUM_LEDS 150
+
+bool gReverseDirection = false;
+void fire_iter() {
+  // Array of temperature readings at each simulation cell
+  static byte heat[FIRE_NUM_LEDS];
+
+  // Step 1.  Cool down every cell a little
+  for( int i = 0; i < FIRE_NUM_LEDS; i++) {
+    heat[i] = qsub8( heat[i],  random8(0, ((COOLING * 10) / FIRE_NUM_LEDS) + 2));
+  }
+
+  // Step 2.  Heat from each cell drifts 'up' and diffuses a little
+  for( int k= FIRE_NUM_LEDS - 1; k >= 2; k--) {
+    heat[k] = (heat[k - 1] + heat[k - 2] + heat[k - 2] ) / 3;
+  }
+  
+  // Step 3.  Randomly ignite new 'sparks' of heat near the bottom
+  if( random8() < SPARKING ) {
+    int y = random8(7);
+    heat[y] = qadd8( heat[y], random8(160,255) );
+  }
+
+  // Step 4.  Map from heat cells to LED colors
+  for( int j = 0; j < FIRE_NUM_LEDS; j++) {
+    CRGB color = HeatColor( heat[j]);
+    int pixelnumber;
+    if( gReverseDirection ) {
+      pixelnumber = (FIRE_NUM_LEDS-1) - j;
+    } else {
+      pixelnumber = j;
+    }
+    // duplicate this over first four strands, which I'll try and make sure are vertical:
+    for (int k=0; k<4; k++) {
+      leds[k*NUM_LEDS_PER_STRIP + pixelnumber] = color;
+    }
+  }
+}
+
+void start_fire(unsigned long duration) {
+  unsigned long endpoint = millis() + duration;
+
+  for (int i=0; i < LEDCOUNT; i++) {
+    leds[i].setRGB(0,0,0);
+  }
+  FastLED.show(); // display this frame
+  FastLED.delay(10); // flush octows2811
+
+  FastLED.setBrightness(128);
+
+  while (millis() < endpoint) {
+    fire_iter();
+    FastLED.show();
+    FastLED.delay(25);
+  }
+  
+  FastLED.setBrightness(255);
+}
+
+
+
 /////////////////////////////////
 
 void setup() {
@@ -149,6 +225,8 @@ void setup() {
   random16_set_seed(analogRead(0));
 
   FastLED.addLeds<WS2811_PORTD,NUM_STRIPS>(leds, NUM_LEDS_PER_STRIP);
+
+  FastLED.setDither(0); // I don't think it'll work right with OctoWS2811's async show
 
   // set to blank
   for (int i=0; i < LEDCOUNT; i++) {
@@ -171,6 +249,7 @@ void setup() {
 
 void loop() {
   pulse(1);
-  pulse(7);
   twinkle(30000L);
+  pulse(7);
+  start_fire(30000L);
 }
