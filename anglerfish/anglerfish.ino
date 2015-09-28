@@ -9,6 +9,7 @@
  * to spend working on this; would love to have had more time.
  * One extra effect I have planned is "bubbles" travelling upwards along
  * vertically mounted LED strips.
+* Longest strip is 3950mm = 118 or 119 LEDs
  * - Toby
  */
 
@@ -18,11 +19,12 @@
 // Pin layouts on the teensy 3.1:
 // WS2811_PORTD: 2,14,7,8,6,20,21,5
 
-#define NUM_LEDS_PER_STRIP 150
+#define NUM_LEDS_PER_STRIP 120
 #define NUM_STRIPS 8
-CRGB leds[NUM_STRIPS * NUM_LEDS_PER_STRIP];
+#define LEDCOUNT (8*120)
 
-#define LEDCOUNT 1200
+CRGB leds[LEDCOUNT+1];
+
 
 ///////////// Test sequence ////////////
 void boot_up() {
@@ -148,15 +150,15 @@ void twinkle(unsigned long duration) {
 
 // COOLING: How much does the air cool as it rises?
 // Less cooling = taller flames.  More cooling = shorter flames.
-// Default 50, suggested range 20-100 
-#define COOLING  45
+// Default 50, suggested range 20-100
+#define COOLING  60
 
 // SPARKING: What chance (out of 255) is there that a new spark will be lit?
 // Higher chance = more roaring fire.  Lower chance = more flickery fire.
 // Default 120, suggested range 50-200.
-#define SPARKING 100
+#define SPARKING 65
 
-#define FIRE_NUM_LEDS 150
+#define FIRE_NUM_LEDS 120
 
 bool gReverseDirection = false;
 void fire_iter() {
@@ -172,7 +174,7 @@ void fire_iter() {
   for( int k= FIRE_NUM_LEDS - 1; k >= 2; k--) {
     heat[k] = (heat[k - 1] + heat[k - 2] + heat[k - 2] ) / 3;
   }
-  
+
   // Step 3.  Randomly ignite new 'sparks' of heat near the bottom
   if( random8() < SPARKING ) {
     int y = random8(7);
@@ -188,8 +190,8 @@ void fire_iter() {
     } else {
       pixelnumber = j;
     }
-    // duplicate this over first four strands, which I'll try and make sure are vertical:
-    for (int k=0; k<4; k++) {
+    // duplicate this over all strands:
+    for (int k=0; k<8; k++) {
       leds[k*NUM_LEDS_PER_STRIP + pixelnumber] = color;
     }
   }
@@ -211,7 +213,7 @@ void start_fire(unsigned long duration) {
     FastLED.show();
     FastLED.delay(25);
   }
-  
+
   FastLED.setBrightness(255);
 }
 
@@ -248,8 +250,10 @@ void setup() {
 
 
 void loop() {
+  pulse(2);
+  twinkle(60000L);
+  pulse(3);
+  pulse(2);
   pulse(1);
-  twinkle(30000L);
-  pulse(7);
-  start_fire(30000L);
+  start_fire(60000L);
 }
